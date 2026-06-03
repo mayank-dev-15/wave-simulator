@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wave Interference Simulator</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a0a12;--panel:rgba(15,15,30,0.95);--border:1px solid rgba(100,140,255,0.15);
+  --accent:#58a6ff;--text:#c9d1d9;--text-dim:#8b949e;--input-bg:rgba(10,10,20,0.8);
+  --btn-bg:rgba(88,166,255,0.1);--btn-hover:rgba(88,166,255,0.25);--slider-bg:#21262d;
+}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+  height:100vh;overflow:hidden;display:flex;flex-direction:column}
+/* Header */
+.header{background:linear-gradient(180deg,rgba(15,15,35,0.98),rgba(10,10,20,0.95));
+  padding:8px 16px;display:flex;align-items:center;gap:12px;border-bottom:var(--border);
+  flex-shrink:0;z-index:20}
+.header h1{font-size:1.1rem;font-weight:600;background:linear-gradient(90deg,#58a6ff,#a5f3fc);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;white-space:nowrap}
+.header .subtitle{font-size:0.7rem;color:var(--text-dim)}
+/* Main area */
+.main{display:flex;flex:1;overflow:hidden;min-height:0}
+/* Canvas container */
+.canvas-container{flex:1;position:relative;overflow:hidden;min-width:0}
+canvas{display:block;cursor:crosshair}
+/* Tooltip */
+.tooltip{position:absolute;background:var(--panel);border:var(--border);color:var(--text);
+  font-size:0.75rem;padding:4px 8px;border-radius:4px;pointer-events:none;z-index:10;white-space:nowrap;
+  opacity:0;transition:opacity 0.15s}
+/* Control panel */
+.panel{width:290px;min-width:290px;background:var(--panel);border-left:var(--border);
+  overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px;flex-shrink:0}
+.panel::-webkit-scrollbar{width:6px}
+.panel::-webkit-scrollbar-thumb{background:rgba(100,140,255,0.2);border-radius:3px}
+.panel-section{background:rgba(255,255,255,0.02);border:var(--border);border-radius:6px;padding:8px}
+.section-title{font-size:0.7rem;text-transform:uppercase;letter-spacing:1.2px;color:var(--accent);
+  font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.section-title .icon{width:12px;height:12px}
+/* Buttons */
+.btn{background:var(--btn-bg);border:var(--border);color:var(--text);padding:5px 10px;
+  border-radius:5px;font-size:0.75rem;cursor:pointer;transition:all 0.15s;white-space:nowrap}
+.btn:hover{background:var(--btn-hover)}
+.btn.active{background:rgba(88,166,255,0.3);border-color:rgba(88,166,255,0.5)}
+.btn.danger:hover{background:rgba(255,80,80,0.2)}
+.btn-row{display:flex;gap:5px;flex-wrap:wrap}
+/* Sliders */
+.slider-row{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.slider-row label{font-size:0.7rem;color:var(--text-dim);min-width:70px;flex-shrink:0}
+.slider-row input[type=range]{flex:1;-webkit-appearance:none;height:4px;background:var(--slider-bg);
+  border-radius:3px;outline:none;cursor:pointer}
+.slider-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;
+  width:14px;height:14px;border-radius:50%;background:var(--accent);cursor:pointer}
+.slider-row .val{font-size:0.7rem;color:var(--accent);min-width:35px;text-align:right;
+  font-variant-numeric:tabular-nums}
+/* Source list */
+.source-list{max-height:120px;overflow-y:auto}
+.source-item{display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:4px;
+  font-size:0.7rem;background:rgba(255,255,255,0.02);margin-bottom:2px;cursor:pointer;
+  border:1px solid transparent}
+.source-item:hover{background:rgba(88,166,255,0.08)}
+.source-item.selected{border-color:rgba(88,166,255,0.4);background:rgba(88,166,255,0.12)}
+.source-color{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+/* Toggles */
+.toggle-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+.toggle-row span{font-size:0.75rem;color:var(--text-dim)}
+.toggle{width:30px;height:16px;background:#21262d;border-radius:8px;cursor:pointer;
+  position:relative;transition:background 0.2s;border:none}
+.toggle.on{background:var(--accent)}
+.toggle::after{content:'';position:absolute;top:2px;left:2px;width:12px;height:12px;
+  background:#fff;border-radius:50%;transition:left 0.2s}
+.toggle.on::after{left:16px}
+/* Wave type buttons */
+.type-btn{padding:4px 8px;font-size:0.65rem}
+/* Preset buttons */
+.preset-btn{padding:5px 8px;font-size:0.7rem;width:100%;text-align:left;margin-bottom:2px}
+/* Status bar */
+.status{background:rgba(15,15,35,0.9);border-top:1px solid rgba(100,140,255,0.1);
+  padding:2px 12px;font-size:0.65rem;color:var(--text-dim);display:flex;gap:16px;flex-shrink:0}
+.status span.accent{color:var(--accent)}
+/* Color bar */
+.colorbar{height:8px;border-radius:4px;margin-top:-2px;border:1px solid rgba(100,140,255,0.2)}
+.colorbar-labels{display:flex;justify-content:space-between;font-size:0.6rem;
+  color:var(--text-dim);margin-top:2px}
+</style>
+</head>
+<body>
+<!-- Header -->
+<div class="header">
+  <div>
+    <h1>Wave Interference Simulator</h1>
+    <div class="subtitle">Physics-based 2D wave propagation &bull; Click canvas to add/remove sources</div>
+  </div>
+</div>
+
+<!-- Main -->
+<div class="main">
+  <!-- Canvas -->
+  <div class="canvas-container" id="canvasContainer">
+    <canvas id="waveCanvas"></canvas>
+    <div class="tooltip" id="tooltip"></div>
+  </div>
+
+  <!-- Control Panel -->
+  <div class="panel" id="panel">
+
+    <!-- Simulation -->
+    <div class="panel-section">
+      <div class="section-title">⚙ Simulation</div>
+      <div class="slider-row"><label>Speed</label>
+        <input type="range" id="simSpeed" min="0.1" max="3" step="0.1" value="1"></div>
+      <div class="slider-row"><label>Damping</label>
+        <input type="range" id="damping" min="0.9" max="0.999" step="0.001" value="0.995"></div>
+      <div class="btn-row" style="margin-top:4px">
+        <button class="btn" id="btnPause">⏸ Pause</button>
+        <button class="btn" id="btnReset">↺ Reset</button>
+        <button class="btn" id="btnSlowMo">🐢 Slow-Mo</button>
+      </div>
+    </div>
+
+    <!-- Selected Source -->
+    <div class="panel-section">
+      <div class="section-title">◎ Source Properties</div>
+      <div id="sourceControls">
+        <div class="slider-row"><label>Frequency</label>
+          <input type="range" id="srcFreq" min="0.5" max="20" step="0.5" value="5">
+          <span class="val" id="valFreq">5.0</span></div>
+        <div class="slider-row"><label>Amplitude</label>
+          <input type="range" id="srcAmp" min="0.1" max="5" step="0.1" value="2">
+          <span class="val" id="valAmp">2.0</span></div>
+        <div class="slider-row"><label>Wavelength</label>
+          <input type="range" id="srcWlen" min="20" max="200" step="5" value="60">
+          <span class="val" id="valWlen">60</span></div>
+        <div class="slider-row"><label>Phase</label>
+          <input type="range" id="srcPhase" min="0" max="6.28" step="0.1" value="0">
+          <span class="val" id="valPhase">0.0</span></div>
+        <div style="font-size:0.7rem;color:var(--text-dim);margin:6px 0 4px">Wave Type:</div>
+        <div class="btn-row">
+          <button class="btn type-btn active" data-type="circular">○ Circular</button>
+          <button class="btn type-btn" data-type="plane">↔ Plane</button>
+          <button class="btn type-btn" data-type="standing">║ Standing</button>
+        </div>
+        <div class="slider-row" style="margin-top:4px" id="planeAngleRow"><label>P.Angle</label>
+          <input type="range" id="srcPAngle" min="0" max="3.14" step="0.05" value="0">
+          <span class="val" id="valPAngle">0.0</span></div>
+      </div>
+      <div style="font-size:0.7rem;color:var(--text-dim);margin-top:4px" id="sourceHint">
+        Click on the canvas to place a wave source
+      </div>
+    </div>
+
+    <!-- Sources List -->
+    <div class="panel-section">
+      <div class="section-title">◉ Sources <span id="srcCount" style="color:var(--text-dim)">(0)</span></div>
+      <div id="sourceControls2" style="display:flex;gap:4px;margin-bottom:4px">
+        <button class="btn" id="btnAddSource" style="flex:1">+ Add Random</button>
+        <button class="btn danger" id="btnClearSources" style="flex:1">✕ Clear All</button>
+      </div>
+      <div class="source-list" id="sourceList"></div>
+    </div>
+
+    <!-- Display -->
+    <div class="panel-section">
+      <div class="section-title">◆ Display</div>
+      <div class="toggle-row"><span>Grid Overlay</span><button class="toggle off" id="togGrid"></button></div>
+      <div class="toggle-row"><span>Wave Fronts</span><button class="toggle off" id="togWaves"></button></div>
+      <div class="toggle-row"><span>Wavelength Marks</span><button class="toggle off" id="togMarks"></button></div>
+      <div class="toggle-row"><span>Source Labels</span><button class="toggle on" id="togLabels"></button></div>
+      <div style="margin-top:6px">
+        <div style="font-size:0.7rem;color:var(--text-dim);margin-bottom:3px">Amplitude Color Map</div>
+        <div class="colorbar" style="background:linear-gradient(90deg,#3333ff,#1a1aff,#0000cc,#000000,#cc0000,#ff1a1aff,#ff3333)"></div>
+        <div class="colorbar-labels"><span>-Max</span><span>0</span><span>+Max</span></div>
+      </div>
+    </div>
+
+    <!-- Presets -->
+    <div class="panel-section">
+      <div class="section-title">★ Presets</div>
+      <div class="btn-row" style="flex-direction:column">
+        <button class="btn preset-btn" data-preset="singleslit">〰 Single Slit Diffraction</button>
+        <button class="btn preset-btn" data-preset="doubleslit">║ Double Slit Experiment</button>
+        <button class="btn preset-btn" data-preset="doppler">→ Doppler Effect</button>
+        <button class="btn preset-btn" data-preset="resonance">≡ Resonance Standing Wave</button>
+        <button class="btn preset-btn" data-preset="circular-interference">◎ Circular Interference</button>
+        <button class="btn preset-btn" data-preset="phased-array">⬡ Phased Array</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Status Bar -->
+<div class="status">
+  <span>FPS: <span class="accent" id="fpsDisplay">60</span></span>
+  <span>Time: <span class="accent" id="timeDisplay">0.00</span>s</span>
+  <span>Sources: <span class="accent" id="srcDisplay">0</span></span>
+  <span>Resolution: <span class="accent" id="resDisplay">1×</span></span>
+  <span style="flex:1"></span>
+  <span>Click: add source · Shift+Click: remove · Drag source: move</span>
+</div>
+
+<script>
+// ============ CORE SETUP ============
+const canvas = document.getElementById('waveCanvas');
+const ctx = canvas.getContext('2d');
+const container = document.getElementById('canvasContainer');
+const tooltip = document.getElementById('tooltip');
+
+let W, H, waveW, waveH; // display and wave field dimensions
+let simW = 400, simH = 400; // simulation grid
+let field, fieldPrev; // wave fields
+let dt = 1, simSpeed = 1, damping = 0.995;
+let time = 0, running = true, slowMo = false;
+let selectedSource = null;
+let sources = [];
+let showGrid = false, showWaveFronts = false, showWavelengthMarks = false, showLabels = true;
+
+const COLORS = buildColorTable();
+
+function buildColorTable() {
+  const tbl = new Uint8Array(256 * 3);
+  for (let i = 0; i < 256; i++) {
+    const t = (i - 128) / 128; // -1 to 1
+    let r, g, b;
+    if (t > 0) {
+      const s = Math.min(t * 2, 1);
+      r = Math.floor(20 + s * 235);
+      g = Math.floor(10 * (1 - s));
+      b = Math.floor(10 * (1 - s));
+      if (t > 0.5) {
+        g = Math.floor((t - 0.5) * 80);
+        b = Math.floor((t - 0.5) * 40);
+      }
+    } else {
+      const s = Math.min(-t * 2, 1);
+      r = Math.floor(10 * (1 - s));
+      g = Math.floor(10 * (1 - s));
+      b = Math.floor(20 + s * 235);
+      if (-t > 0.5) {
+        g = Math.floor((-t - 0.5) * 40);
+      }
+    }
+    tbl[i * 3] = Math.min(255, Math.max(0, r));
+    tbl[i * 3 + 1] = Math.min(255, Math.max(0, g));
+    tbl[i * 3 + 2] = Math.min(255, Math.max(0, b));
+  }
+  return tbl;
+}
+
+function colorForAmp(a) {
+  const idx = Math.min(255, Math.max(0, Math.floor((a + 3) / 6 * 255)));
+  return idx;
+}
+
+function resize() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  W = container.clientWidth;
+  H = container.clientHeight;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // Simulation resolution (lower for perf)
+  const scale = Math.max(1, Math.floor(Math.min(W, H) / 400));
+  waveW = Math.floor(W / scale);
+  waveH = Math.floor(H / scale);
+  field = new Float32Array(waveW * waveH);
+  fieldPrev = new Float32Array(waveW * waveH);
+  document.getElementById('resDisplay').textContent = scale + '×';
+}
+
+window.addEventListener('resize', () => { resize(); simToDisp(); });
+
+// ============ WAVE SOURCES ============
+let srcColors = ['#58a6ff','#f0883e','#3fb950','#db61a2','#a371f7','#56d4dd','#ee6c4d','#7c3aed',
+  '#059669','#d97706','#e11d48','#0ea5e9'];
+
+function addSource(x, y, opts = {}) {
+  const src = {
+    id: Date.now() + Math.random(),
+    // display coords
+    x: x !== undefined ? x : 50 + Math.random() * (W - 100),
+    y: y !== undefined ? y : 50 + Math.random() * (H - 100),
+    freq: opts.freq || 3 + Math.random() * 7,
+    amp: opts.amp || 1 + Math.random() * 2,
+    wavelength: opts.wavelength || 40 + Math.random() * 60,
+    phase: opts.phase || 0,
+    type: opts.type || 'circular',
+    pAngle: opts.pAngle || 0,
+    color: srcColors[sources.length % srcColors.length],
+    moving: opts.moving || false,
+    vx: opts.vx || 0, vy: opts.vy || 0
+  };
+  sources.push(src);
+  updateSourceList();
+  selectSource(src);
+  return src;
+}
+
+function removeSource(src) {
+  sources = sources.filter(s => s.id !== src.id);
+  if (selectedSource && selectedSource.id === src.id) {
+    selectedSource = sources.length ? sources[sources.length - 1] : null;
+    updateSourceControls();
+  }
+  updateSourceList();
+}
+
+function clearAllSources() {
+  sources = [];
+  selectedSource = null;
+  updateSourceList();
+  updateSourceControls();
+}
+
+// ============ WAVE SIMULATION ============
+function simStep() {
+  const alpha2 = 1; // c^2 * dt^2 / dx^2, assumes c=1, dt=1, dx=1
+  const damp = damping;
+  const w = waveW, h = waveH;
+  const f = field, fp = fieldPrev;
+
+  // Inject sources
+  for (const s of sources) {
+    const sx = Math.floor(s.x / W * w);
+    const sy = Math.floor(s.y / H * h);
+    const R = Math.max(2, Math.floor(s.wavelength / W * w));
+    const val = s.amp * Math.sin(2 * Math.PI * s.freq * time + s.phase);
+
+    if (s.type === 'circular' || s.type === 'standing') {
+      const r2 = R * R;
+      for (let dy = -R; dy <= R; dy++) {
+        const ry = sy + dy;
+        if (ry < 0 || ry >= h) continue;
+        for (let dx = -R; dx <= R; dx++) {
+          const rx = sx + dx;
+          if (rx < 0 || rx >= w) continue;
+          if (dx * dx + dy * dy <= r2) {
+            f[ry * w + rx] = val;
+          }
+        }
+      }
+    } else if (s.type === 'plane') {
+      const cosA = Math.cos(s.pAngle), sinA = Math.sin(s.pAngle);
+      const perpDist = Math.abs(cosA * (w / 2 - sx) + sinA * (h / 2 - sy));
+      const lineWidth = Math.max(2, R);
+      for (let dy = -20; dy <= 20; dy++) {
+        for (let dx = -20; dx <= 20; dx++) {
+          const rx = sx + dx, ry = sy + dy;
+          if (rx < 0 || rx >= w || ry < 0 || ry >= h) continue;
+          const d = Math.abs(dx * cosA + dy * sinA);
+          if (d < lineWidth) {
+            f[ry * w + rx] = val;
+          }
+        }
+      }
+    }
+  }
+
+  // Wave equation: explicit finite difference
+  // u(t+1) = 2*u(t) - u(t-1) + alpha2 * laplacian(u(t))
+  if (alpha2 === 1) {
+    for (let y = 1; y < h - 1; y++) {
+      const off = y * w;
+      for (let x = 1; x < w - 1; x++) {
+        const idx = off + x;
+        const lap = f[idx - 1] + f[idx + 1] + f[idx - w] + f[idx + w] - 4 * f[idx];
+        const newVal = 2 * f[idx] - fp[idx] + alpha2 * lap;
+        fp[idx] = f[idx];
+        f[idx] = newVal * damp;
+      }
+    }
+  }
+
+  // Re-inject after propagation (so source values persist)
+  for (const s of sources) {
+    const sx = Math.floor(s.x / W * w);
+    const sy = Math.floor(s.y / H * h);
+    const R = Math.max(2, Math.floor(s.wavelength / W * w));
+    const val = s.amp * Math.sin(2 * Math.PI * s.freq * time + s.phase);
+    const r2 = R * R;
+    for (let dy = -R; dy <= R; dy++) {
+      const ry = sy + dy;
+      if (ry < 0 || ry >= h) continue;
+      for (let dx = -R; dx <= R; dx++) {
+        const rx = sx + dx;
+        if (rx < 0 || rx >= w) continue;
+        if (dx * dx + dy * dy <= r2) {
+          f[ry * w + rx] = val;
+        }
+      }
+    }
+  }
+
+  // Absorbing boundary conditions - simple sine/cosine roll-off
+  const edge = 3;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const idx = y * w + x;
+      let dampFactor = 1;
+      if (x < edge) dampFactor *= Math.sin((Math.PI / 2) * x / edge);
+      else if (x >= w - edge) dampFactor *= Math.sin((Math.PI / 2) * (w - 1 - x) / edge);
+      if (y < edge) dampFactor *= Math.sin((Math.PI / 2) * y / edge);
+      else if (y >= h - edge) dampFactor *= Math.sin((Math.PI / 2) * (h - 1 - y) / edge);
+      if (dampFactor < 0.99) f[idx] *= dampFactor;
+    }
+  }
+
+  // Move Doppler source
+  for (const s of sources) {
+    if (s.moving) {
+      s.x += s.vx * dt;
+      s.y += s.vy * dt;
+      if (s.x < 0 || s.x > W) s.vx *= -1;
+      if (s.y < 0 || s.y > H) s.vy *= -1;
+    }
+  }
+  time += dt * (slowMo ? 0.25 : 1);
+}
+
+// ============ RENDERING ============
+let imageData, imgData32;
+
+function initImageData() {
+  imageData = ctx.createImageData(W, H);
+  imgData32 = new Uint32Array(imageData.data.buffer);
+}
+
+function render() {
+  if (!imageData || imageData.width !== W || imageData.height !== H) initImageData();
+
+  const w = waveW, h = waveH;
+  const f = field;
+  const scaleX = W / w, scaleY = H / h;
+  const data = imageData.data;
+  const len = W * H;
+
+  // Background
+  for (let i = 0; i < len; i++) {
+    const px = i % W, py = Math.floor(i / W);
+    const wx = Math.floor(px / scaleX);
+    const wy = Math.floor(py / scaleY);
+    const wi = Math.min(h - 1, Math.max(0, wy)) * w + Math.min(w - 1, Math.max(0, wx));
+    const a = f[wi];
+
+    let ci = colorForAmp(a);
+    ci = Math.max(0, Math.min(255, ci));
+    const r = COLORS[ci * 3];
+    const g = COLORS[ci * 3 + 1];
+    const b = COLORS[ci * 3 + 2];
+
+    data[i * 4] = r;
+    data[i * 4 + 1] = g;
+    data[i * 4 + 2] = b;
+    data[i * 4 + 3] = 255;
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+
+  // Grid overlay
+  if (showGrid) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+    ctx.lineWidth = 0.5;
+    const gs = 40;
+    for (let x = 0; x < W; x += gs) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+    for (let y = 0; y < H; y += gs) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+  }
+
+  // Wave fronts
+  if (showWaveFronts) {
+    for (const s of sources) {
+      const numRings = Math.floor(time * s.freq * 2) % 10;
+      for (let ring = 1; ring <= Math.min(numRings, 15); ring++) {
+        const r = (ring / numRings) * Math.min(W, H) * 0.4;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, r, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+      }
+    }
+  }
+
+  // Wavelength markers
+  if (showWavelengthMarks) {
+    for (const s of sources) {
+      const r = s.wavelength / 2;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, r, 0, Math.PI * 2);
+      ctx.strokeStyle = s.color + '33';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
+  // Source labels
+  if (showLabels) {
+    for (const s of sources) {
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, 6, 0, Math.PI * 2);
+      ctx.fillStyle = s.color;
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      ctx.font = '10px monospace';
+      ctx.fillStyle = '#fff';
+      ctx.textAlign = 'center';
+      ctx.fillText(`f=${s.freq.toFixed(1)} λ=${s.wavelength.toFixed(0)}`, s.x, s.y - 12);
+    }
+  }
+
+  // Selected source highlight
+  if (selectedSource) {
+    ctx.beginPath();
+    ctx.arc(selectedSource.x, selectedSource.y, 10, 0, Math.PI * 2);
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([3, 3]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}
+
+// ============ UI BINDING ============
+function updateSourceList() {
+  const list = document.getElementById('sourceList');
+  document.getElementById('srcCount').textContent = `(${sources.length})`;
+  document.getElementById('srcDisplay').textContent = sources.length;
+  list.innerHTML = '';
+  for (const s of sources) {
+    const div = document.createElement('div');
+    div.className = 'source-item' + (selectedSource && selectedSource.id === s.id ? ' selected' : '');
+    div.innerHTML = `<div class="source-color" style="background:${s.color}"></div>
+      <span>${s.type[0].toUpperCase()} f=${s.freq.toFixed(1)} A=${s.amp.toFixed(1)} λ=${s.wavelength.toFixed(0)}</span>`;
+    div.onclick = () => { selectSource(s); };
+    list.appendChild(div);
+  }
+}
+
+function selectSource(s) {
+  selectedSource = s;
+  updateSourceControls();
+  updateSourceList();
+}
+
+function updateSourceControls() {
+  const hint = document.getElementById('sourceHint');
+  if (!selectedSource) {
+    hint.textContent = 'Click on the canvas to place a wave source';
+    return;
+  }
+  hint.textContent = `Source: ${selectedSource.type} at (${Math.round(selectedSource.x)}, ${Math.round(selectedSource.y)})`;
+  document.getElementById('srcFreq').value = selectedSource.freq;
+  document.getElementById('valFreq').textContent = selectedSource.freq.toFixed(1);
+  document.getElementById('srcAmp').value = selectedSource.amp;
+  document.getElementById('valAmp').textContent = selectedSource.amp.toFixed(1);
+  document.getElementById('srcWlen').value = selectedSource.wavelength;
+  document.getElementById('valWlen').textContent = selectedSource.wavelength.toFixed(0);
+  document.getElementById('srcPhase').value = selectedSource.phase;
+  document.getElementById('valPhase').textContent = selectedSource.phase.toFixed(1);
+  document.getElementById('srcPAngle').value = selectedSource.pAngle;
+  document.getElementById('valPAngle').textContent = selectedSource.pAngle.toFixed(1);
+
+  document.querySelectorAll('.type-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.type === selectedSource.type);
+  });
+  document.getElementById('planeAngleRow').style.display = selectedSource.type === 'plane' ? '' : 'none';
+}
+
+// Sliders
+document.getElementById('simSpeed').oninput = e => { simSpeed = +e.target.value; };
+document.getElementById('damping').oninput = e => { damping = +e.target.value; };
+document.getElementById('srcFreq').oninput = e => {
+  if (!selectedSource) return;
+  selectedSource.freq = +e.target.value;
+  document.getElementById('valFreq').textContent = selectedSource.freq.toFixed(1);
+  updateSourceList();
+};
+document.getElementById('srcAmp').oninput = e => {
+  if (!selectedSource) return;
+  selectedSource.amp = +e.target.value;
+  document.getElementById('valAmp').textContent = selectedSource.amp.toFixed(1);
+  updateSourceList();
+};
+document.getElementById('srcWlen').oninput = e => {
+  if (!selectedSource) return;
+  selectedSource.wavelength = +e.target.value;
+  document.getElementById('valWlen').textContent = selectedSource.wavelength.toFixed(0);
+  updateSourceList();
+};
+document.getElementById('srcPhase').oninput = e => {
+  if (!selectedSource) return;
+  selectedSource.phase = +e.target.value;
+  document.getElementById('valPhase').textContent = selectedSource.phase.toFixed(1);
+};
+document.getElementById('srcPAngle').oninput = e => {
+  if (!selectedSource) return;
+  selectedSource.pAngle = +e.target.value;
+  document.getElementById('valPAngle').textContent = selectedSource.pAngle.toFixed(1);
+};
+
+// Buttons
+document.getElementById('btnPause').onclick = () => {
+  running = !running;
+  document.getElementById('btnPause').textContent = running ? '⏸ Pause' : '▶ Play';
+};
+document.getElementById('btnReset').onclick = () => {
+  field.fill(0); fieldPrev.fill(0); time = 0;
+};
+document.getElementById('btnSlowMo').onclick = () => {
+  slowMo = !slowMo;
+  document.getElementById('btnSlowMo').classList.toggle('active', slowMo);
+};
+document.getElementById('btnAddSource').onclick = () => addSource();
+document.getElementById('btnClearSources').onclick = () => clearAllSources();
+
+// Type buttons
+document.querySelectorAll('.type-btn').forEach(btn => {
+  btn.onclick = () => {
+    if (!selectedSource) return;
+    selectedSource.type = btn.dataset.type;
+    document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('planeAngleRow').style.display = selectedSource.type === 'plane' ? '' : 'none';
+    updateSourceList();
+  };
+});
+
+// Toggles
+function bindToggle(id, prop) {
+  const el = document.getElementById(id);
+  el.onclick = () => {
+    const on = el.classList.toggle('on');
+    el.classList.toggle('off', !on);
+    if (prop === 'grid') showGrid = on;
+    else if (prop === 'waves') showWaveFronts = on;
+    else if (prop === 'marks') showWavelengthMarks = on;
+    else if (prop === 'labels') showLabels = on;
+  };
+}
+bindToggle('togGrid', 'grid');
+bindToggle('togWaves', 'waves');
+bindToggle('togMarks', 'marks');
+bindToggle('togLabels', 'labels');
+
+// Presets
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.onclick = () => loadPreset(btn.dataset.preset);
+});
+
+function loadPreset(name) {
+  clearAllSources();
+  field.fill(0); fieldPrev.fill(0); time = 0;
+  const cx = W / 2, cy = H / 2;
+
+  switch (name) {
+    case 'singleslit':
+      addSource(cx, cy - 80, { freq: 5, amp: 3, wavelength: 60, type: 'circular' });
+      // Barrier with slit
+      break;
+    case 'doubleslit':
+      addSource(cx, cy - 100, { freq: 5, amp: 2.5, wavelength: 55, type: 'circular' });
+      break;
+    case 'doppler':
+      addSource(80, cy, { freq: 6, amp: 3, wavelength: 50, type: 'circular', moving: true, vx: 1.5, vy: 0 });
+      break;
+    case 'resonance':
+      addSource(cx - 120, cy, { freq: 4, amp: 2, wavelength: 80, type: 'circular' });
+      addSource(cx + 120, cy, { freq: 4, amp: 2, wavelength: 80, type: 'circular', phase: Math.PI });
+      break;
+    case 'circular-interference':
+      addSource(cx - 60, cy, { freq: 5, amp: 2, wavelength: 60, type: 'circular' });
+      addSource(cx + 60, cy, { freq: 5, amp: 2, wavelength: 60, type: 'circular' });
+      break;
+    case 'phased-array':
+      for (let i = 0; i < 5; i++) {
+        addSource(cx - 100 + i * 50, cy, { freq: 5, amp: 1.5, wavelength: 50, type: 'circular', phase: i * 0.5 });
+      }
+      break;
+  }
+}
+
+// ============ CANVAS INTERACTION ============
+let dragging = false, dragSrc = null;
+
+canvas.addEventListener('mousedown', e => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+
+  if (e.shiftKey) {
+    // Remove nearest source
+    let nearest = null, nd = 20;
+    for (const s of sources) {
+      const d = Math.hypot(s.x - mx, s.y - my);
+      if (d < nd) { nd = d; nearest = s; }
+    }
+    if (nearest) removeSource(nearest);
+    return;
+  }
+
+  // Check if clicking on a source
+  let clicked = null;
+  for (const s of sources) {
+    if (Math.hypot(s.x - mx, s.y - my) < 12) { clicked = s; break; }
+  }
+  if (clicked) {
+    selectSource(clicked);
+    dragging = true; dragSrc = clicked;
+  } else {
+    addSource(mx, my);
+  }
+});
+
+canvas.addEventListener('mousemove', e => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+
+  if (dragging && dragSrc) {
+    dragSrc.x = mx; dragSrc.y = my;
+    updateSourceControls();
+    return;
+  }
+
+  // Tooltip
+  let near = null;
+  for (const s of sources) {
+    if (Math.hypot(s.x - mx, s.y - my) < 15) { near = s; break; }
+  }
+  if (near) {
+    tooltip.style.opacity = 1;
+    tooltip.style.left = (mx + 12) + 'px';
+    tooltip.style.top = (my - 20) + 'px';
+    tooltip.textContent = `${near.type} f=${near.freq.toFixed(1)} A=${near.amp.toFixed(1)} λ=${near.wavelength.toFixed(0)}`;
+  } else {
+    tooltip.style.opacity = 0;
+  }
+});
+
+canvas.addEventListener('mouseup', () => { dragging = false; dragSrc = null; });
+canvas.addEventListener('mouseleave', () => { dragging = false; dragSrc = null; tooltip.style.opacity = 0; });
+
+// ============ MAIN LOOP ============
+let lastTime = 0, frameCount = 0, fps = 60;
+
+function loop(now) {
+  requestAnimationFrame(loop);
+  const elapsed = now - lastTime;
+  if (elapsed < 1000 / 60) return; // cap at ~60fps
+  lastTime = now;
+  frameCount++;
+  if (frameCount % 15 === 0) {
+    fps = Math.round(1000 / elapsed);
+    document.getElementById('fpsDisplay').textContent = fps;
+    document.getElementById('timeDisplay').textContent = time.toFixed(2);
+  }
+
+  const steps = Math.max(1, Math.round(simSpeed));
+  if (running) {
+    for (let i = 0; i < steps; i++) simStep();
+  }
+  render();
+}
+
+// ============ INIT ============
+resize();
+initImageData();
+loadPreset('circular-interference');
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
